@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Lint proto
+        run: make lint
+      - name: Check generated code is current
+        run: |
+          make generate
+          git diff --exit-code
+      - name: Breaking change check
+        if: github.event_name == 'pull_request'
+        run: go tool -modfile=tools/go.mod buf breaking --against ".git#ref=refs/remotes/origin/${{ github.base_ref }}"
+      - name: Test
+        run: make test
+      - name: govulncheck
+        run: make vuln
