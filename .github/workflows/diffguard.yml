@@ -25,7 +25,9 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          # diffguard itself requires go >= 1.26 (newer than this module's
+          # directive, which setup-go would otherwise pick from go.mod).
+          go-version: "1.26.4"
 
       - uses: actions/cache@v4
         with:
