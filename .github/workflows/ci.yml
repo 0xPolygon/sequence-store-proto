@@ -23,7 +23,14 @@ jobs:
           git diff --exit-code
       - name: Breaking change check
         if: github.event_name == 'pull_request'
-        run: go tool -modfile=tools/go.mod buf breaking --against ".git#ref=refs/remotes/origin/${{ github.base_ref }}"
+        # Skipped while the base branch has no protos (repo bootstrap);
+        # self-arming once the first proto lands on the base.
+        run: |
+          if git ls-tree -r "refs/remotes/origin/${{ github.base_ref }}" --name-only | grep -q '\.proto$'; then
+            go tool -modfile=tools/go.mod buf breaking --against ".git#ref=refs/remotes/origin/${{ github.base_ref }}"
+          else
+            echo "base branch has no .proto files yet; skipping breaking check"
+          fi
       - name: Test
         run: make test
       - name: govulncheck
