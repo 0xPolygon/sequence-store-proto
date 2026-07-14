@@ -92,6 +92,10 @@ func TestRangePaging(t *testing.T) {
 			t.Fatalf("Range: %v", err)
 		}
 
+		if len(resp.GetEntries()) > 2 {
+			t.Fatalf("page has %d entries, limit is 2", len(resp.GetEntries()))
+		}
+
 		got += len(resp.GetEntries())
 		next = resp.GetNext()
 
@@ -102,8 +106,8 @@ func TestRangePaging(t *testing.T) {
 
 	store.mu.Lock()
 	total := len(store.log)
-	head := store.head
 	store.mu.Unlock()
+	head := store.Head()
 
 	if got != total {
 		t.Errorf("paged %d entries, want %d", got, total)
@@ -122,6 +126,29 @@ func TestRangePaging(t *testing.T) {
 	if len(resp.GetEntries()) != 0 || commitment.Head(resp.GetNext()) != head {
 		t.Errorf("tip range = %d entries, next %x; want 0 entries, next %x",
 			len(resp.GetEntries()), resp.GetNext(), head)
+	}
+}
+
+// An unpositioned Range on an empty store returns the seed as next — the
+// chain-start position, valid to page from.
+func TestRangeEmptyStore(t *testing.T) {
+	store, _, con := setupGRPC(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := con.Range(ctx, &pb.RangeRequest{})
+	if err != nil {
+		t.Fatalf("Range: %v", err)
+	}
+
+	if len(resp.GetEntries()) != 0 || !resp.GetLive() {
+		t.Errorf("empty store range = %d entries, live %v; want 0, true",
+			len(resp.GetEntries()), resp.GetLive())
+	}
+
+	if commitment.Head(resp.GetNext()) != store.Head() {
+		t.Errorf("next = %x, want seed %x", resp.GetNext(), store.Head())
 	}
 }
 
@@ -210,6 +237,21 @@ func TestStreamFollowsAfterLive(t *testing.T) {
 		if frame.GetEntry() == nil {
 			t.Fatalf("frame %d after Live is not an entry (duplicate Live?)", i)
 		}
+	}
+
+	// Live marks one transition, not idleness: let the server drain to an
+	// empty tail, then append again — the next frame must be the entry, not
+	// a second Live.
+	time.Sleep(200 * time.Millisecond)
+	mustAppend(t, store, c.record([]byte{0x06}))
+
+	frame, err = cs.Recv()
+	if err != nil {
+		t.Fatalf("recv after idle: %v", err)
+	}
+
+	if frame.GetEntry() == nil {
+		t.Fatal("frame after idle gap is not an entry (duplicate Live?)")
 	}
 }
 

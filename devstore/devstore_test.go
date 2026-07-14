@@ -118,6 +118,23 @@ func TestAppendHappyPath(t *testing.T) {
 	}
 }
 
+// The fold is over the decoded base-fee value, not the wire bytes: a
+// zero-padded encoding is accepted and the store's head matches the
+// producer's value-computed fold.
+func TestBaseFeePaddedEncodingAccepted(t *testing.T) {
+	s := New(testChainID)
+	c, _, hash2 := seedBlocks(t, s)
+
+	entry := c.open(103, hash2)
+	open := entry.GetKind().(*pb.Entry_BlockOpen).BlockOpen
+	open.BaseFee = append([]byte{0x00}, open.BaseFee...)
+	mustAppend(t, s, entry)
+
+	if s.Head() != c.head {
+		t.Errorf("store head %x diverged from value-computed head %x", s.Head(), c.head)
+	}
+}
+
 func TestAppendStaleCommitment(t *testing.T) {
 	s := New(testChainID)
 	c, _, hash2 := seedBlocks(t, s)
@@ -182,23 +199,6 @@ func TestAppendRejections(t *testing.T) {
 		{"seal_short_prefix", func(s *Store, _ [32]byte) *pb.Entry {
 			return &pb.Entry{Kind: &pb.Entry_BlockSeal{BlockSeal: &pb.BlockSeal{
 				Header: []byte("h"), PrefixCommitment: []byte{0x01},
-			}}}
-		}, pb.AckStatus_ACK_STATUS_MALFORMED},
-		{"base_fee_max_width_ok_shape", func(s *Store, hash2 [32]byte) *pb.Entry {
-			// 32-byte fee with a leading zero is non-minimal — rejected —
-			// which pins the boundary between width and minimality checks.
-			fee := make([]byte, 32)
-			fee[1] = 0x01
-
-			return &pb.Entry{Kind: &pb.Entry_BlockOpen{BlockOpen: &pb.BlockOpen{
-				BlockNumber: 103, ParentHash: hash2[:], GasLimit: 1,
-				BaseFee: fee, PrefixCommitment: prefix(s),
-			}}}
-		}, pb.AckStatus_ACK_STATUS_MALFORMED},
-		{"base_fee_leading_zero", func(s *Store, hash2 [32]byte) *pb.Entry {
-			return &pb.Entry{Kind: &pb.Entry_BlockOpen{BlockOpen: &pb.BlockOpen{
-				BlockNumber: 103, ParentHash: hash2[:], GasLimit: 1,
-				BaseFee: []byte{0x00, 0x01}, PrefixCommitment: prefix(s),
 			}}}
 		}, pb.AckStatus_ACK_STATUS_MALFORMED},
 		{"known_parent_wrong_height", func(s *Store, hash2 [32]byte) *pb.Entry {

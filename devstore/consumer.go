@@ -32,7 +32,7 @@ func (s *Store) resolveAfter(head []byte, block *uint64) (int, error) {
 
 		return pos, nil
 	case block != nil:
-		gen, ok := s.gens[*block]
+		gen, ok := s.state.Generation(*block)
 		if !ok {
 			return 0, status.Error(codes.NotFound, "unknown block")
 		}
@@ -40,11 +40,11 @@ func (s *Store) resolveAfter(head []byte, block *uint64) (int, error) {
 		// A still-open latest generation is served from its open record:
 		// resolving past its in-progress entries would strand the consumer
 		// mid-block, without the block's context or the re-anchor signal.
-		if !gen.sealed {
-			return gen.positions[0], nil
+		if !gen.Sealed {
+			return int(gen.Positions[0]), nil
 		}
 
-		return gen.positions[len(gen.positions)-1] + 1, nil
+		return int(gen.Positions[len(gen.Positions)-1]) + 1, nil
 	default:
 		return 0, nil
 	}
@@ -192,7 +192,7 @@ func (s *Store) rangeResponse(entries []*pb.Entry, pos int) *pb.RangeResponse {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	next := s.seed
+	next := s.state.Seed()
 	if pos > 0 {
 		next = s.heads[pos-1]
 	}
@@ -210,13 +210,13 @@ func (s *Store) GetBlock(_ context.Context, req *pb.GetBlockRequest) (*pb.GetBlo
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	gen, ok := s.gens[req.GetBlockNumber()]
+	gen, ok := s.state.Generation(req.GetBlockNumber())
 	if !ok {
 		return nil, status.Error(codes.NotFound, "unknown block")
 	}
 
-	entries := make([]*pb.Entry, 0, len(gen.positions))
-	for _, pos := range gen.positions {
+	entries := make([]*pb.Entry, 0, len(gen.Positions))
+	for _, pos := range gen.Positions {
 		entries = append(entries, s.log[pos])
 	}
 
