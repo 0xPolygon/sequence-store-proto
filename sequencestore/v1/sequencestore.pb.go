@@ -33,8 +33,8 @@ const (
 	AckStatus_ACK_STATUS_STALE_COMMITMENT AckStatus = 2
 	// Entry fails structural validation — a producer-side bug; do not retry
 	// unchanged. Structurally invalid: a Record with zero transactions, a
-	// commitment or parent-hash field that is not 32 bytes, a base fee that is
-	// not minimally encoded or exceeds 32 bytes, a missing entry kind.
+	// commitment or parent-hash field that is not 32 bytes, a base fee wider
+	// than 32 bytes, a missing entry kind.
 	AckStatus_ACK_STATUS_MALFORMED AckStatus = 3
 	// Throttled; retry later.
 	AckStatus_ACK_STATUS_RATE_LIMITED AckStatus = 4
@@ -89,10 +89,9 @@ func (AckStatus) EnumDescriptor() ([]byte, []int) {
 // it — every header field execution depends on.
 type BlockOpen struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The block being opened (N) — the height the ingress runs the election
-	// check at. Carried because a forward-jump
-	// re-anchor names a parent the store never saw, so the height is not
-	// derivable from store state.
+	// The block being opened (N). Carried because a forward-jump re-anchor
+	// names a parent the store never saw, so the height is not derivable from
+	// store state.
 	BlockNumber uint64 `protobuf:"varint,1,opt,name=block_number,json=blockNumber,proto3" json:"block_number,omitempty"`
 	// N's header timestamp, fixed at open.
 	BlockTimestamp uint64 `protobuf:"varint,2,opt,name=block_timestamp,json=blockTimestamp,proto3" json:"block_timestamp,omitempty"`
@@ -103,9 +102,10 @@ type BlockOpen struct {
 	ParentHash []byte `protobuf:"bytes,3,opt,name=parent_hash,json=parentHash,proto3" json:"parent_hash,omitempty"`
 	// N's block gas limit — producer-chosen, not derivable from the parent.
 	GasLimit uint64 `protobuf:"varint,4,opt,name=gas_limit,json=gasLimit,proto3" json:"gas_limit,omitempty"`
-	// N's base fee as a big-endian unsigned integer, minimally encoded (no
-	// leading zero bytes; empty means zero), at most 32 bytes — producer-local
-	// policy post-Lisovo, not derivable by consumers.
+	// N's base fee as a big-endian unsigned integer, at most 32 bytes (empty
+	// means zero; leading zeros are allowed — the fold is over the decoded
+	// value, not the wire bytes) — producer-local policy post-Lisovo, not
+	// derivable by consumers.
 	BaseFee []byte `protobuf:"bytes,5,opt,name=base_fee,json=baseFee,proto3" json:"base_fee,omitempty"`
 	// The store head this entry extends (32 bytes) — C_seal of the last sealed
 	// block on the normal path.

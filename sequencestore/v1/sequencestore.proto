@@ -22,10 +22,9 @@ option go_package = "github.com/0xPolygon/sequence-store-proto/sequencestore/v1;
 // BlockOpen fixes block N's header context at the moment the producer opens
 // it — every header field execution depends on.
 message BlockOpen {
-  // The block being opened (N) — the height the ingress runs the election
-  // check at. Carried because a forward-jump
-  // re-anchor names a parent the store never saw, so the height is not
-  // derivable from store state.
+  // The block being opened (N). Carried because a forward-jump re-anchor
+  // names a parent the store never saw, so the height is not derivable from
+  // store state.
   uint64 block_number = 1;
 
   // N's header timestamp, fixed at open.
@@ -40,9 +39,10 @@ message BlockOpen {
   // N's block gas limit — producer-chosen, not derivable from the parent.
   uint64 gas_limit = 4;
 
-  // N's base fee as a big-endian unsigned integer, minimally encoded (no
-  // leading zero bytes; empty means zero), at most 32 bytes — producer-local
-  // policy post-Lisovo, not derivable by consumers.
+  // N's base fee as a big-endian unsigned integer, at most 32 bytes (empty
+  // means zero; leading zeros are allowed — the fold is over the decoded
+  // value, not the wire bytes) — producer-local policy post-Lisovo, not
+  // derivable by consumers.
   bytes base_fee = 5;
 
   // The store head this entry extends (32 bytes) — C_seal of the last sealed
@@ -104,8 +104,8 @@ enum AckStatus {
 
   // Entry fails structural validation — a producer-side bug; do not retry
   // unchanged. Structurally invalid: a Record with zero transactions, a
-  // commitment or parent-hash field that is not 32 bytes, a base fee that is
-  // not minimally encoded or exceeds 32 bytes, a missing entry kind.
+  // commitment or parent-hash field that is not 32 bytes, a base fee wider
+  // than 32 bytes, a missing entry kind.
   ACK_STATUS_MALFORMED = 3;
 
   // Throttled; retry later.

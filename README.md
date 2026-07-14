@@ -12,7 +12,8 @@ tests and devnets:
 | ------------------- | -------------------------------------------------------------------------- |
 | `sequencestore/v1/` | Protobuf schema (`sequencestore.proto`) and committed generated Go bindings |
 | `commitment/`       | The normative commitment fold: genesis seed, domain tags, canonical encodings, `C_open`/`C_block`/`C_seal` |
-| `devstore/`         | In-memory reference store for tests and devnets: real head check, folds, resume, and block reads — no persistence, auth, replication, or election verification |
+| `chainstate/`       | The chain state machine every store implementation shares: structural validation, the head check, fold application, generation tracking, snapshot/restore — storage-agnostic |
+| `devstore/`         | In-memory reference store for tests and devnets: `chainstate` composed with an in-memory log — no persistence, auth, or replication |
 | `cmd/devstore/`     | Standalone plaintext-gRPC devstore binary (`--addr`, `--chain-id`) |
 
 ## The contract in one paragraph
