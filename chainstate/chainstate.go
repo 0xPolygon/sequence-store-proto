@@ -49,6 +49,20 @@ func New(chainID uint64) *State {
 	}
 }
 
+// NewAt returns a state resuming at head instead of the genesis seed, for
+// replayers adopting a trusted mid-chain position: a cold replay of a
+// partially retained log skips to its first BlockOpen and adopts that
+// open's prefix commitment — trustworthy because it was head-checked when
+// appended. Generations and known parents below the adopted point are
+// unknown to the state, matching what the log below the retention floor no
+// longer carries.
+func NewAt(chainID uint64, head commitment.Head) *State {
+	s := New(chainID)
+	s.head = head
+
+	return s
+}
+
 // Seed returns the genesis seed the chain starts from.
 func (s *State) Seed() commitment.Head {
 	return s.seed

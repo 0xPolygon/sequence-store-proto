@@ -188,6 +188,38 @@ func TestRestoreKeepsKnownParents(t *testing.T) {
 	}
 }
 
+// A replayer that adopts a mid-chain head applies the tail identically to a
+// state that lived through the whole chain.
+func TestNewAtAdoptedHead(t *testing.T) {
+	full := New(testChainID)
+	c := newChain(t)
+	mustApply(t, full, c.open(101, [32]byte{0xef}), c.record([]byte{0x01}))
+
+	seal1, hash1 := c.seal([]byte("header-101"))
+	mustApply(t, full, seal1)
+
+	// The adopted point: block 102's open, prefix = C_seal(101).
+	open102 := c.open(102, hash1)
+	adopted := NewAt(testChainID, commitment.Head(open102.GetBlockOpen().GetPrefixCommitment()))
+
+	for _, s := range []*State{full, adopted} {
+		cc := *c
+		entry102 := &pb.Entry{Kind: &pb.Entry_BlockOpen{BlockOpen: open102.GetBlockOpen()}}
+		mustApply(t, s, entry102, cc.record([]byte{0x02}))
+
+		seal2, _ := cc.seal([]byte("header-102"))
+		mustApply(t, s, seal2)
+	}
+
+	if full.Head() != adopted.Head() {
+		t.Errorf("adopted-head replay diverged: %x vs %x", full.Head(), adopted.Head())
+	}
+
+	if adopted.Seed() != full.Seed() {
+		t.Errorf("NewAt changed the seed: %x vs %x", adopted.Seed(), full.Seed())
+	}
+}
+
 func TestRestoreErrors(t *testing.T) {
 	valid := New(testChainID)
 
