@@ -728,6 +728,7 @@ type RangeRequest struct {
 	Limit uint32 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
 	// Long-poll budget in milliseconds: if fewer than limit entries are
 	// ready, the request is held up to this long for more before returning.
+	// A server maximum applies.
 	WaitMs        uint32 `protobuf:"varint,4,opt,name=wait_ms,json=waitMs,proto3" json:"wait_ms,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

@@ -7,6 +7,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/0xPolygon/sequence-store-proto/commitment"
 	pb "github.com/0xPolygon/sequence-store-proto/sequencestore/v1"
@@ -126,6 +127,77 @@ func TestRangePaging(t *testing.T) {
 	if len(resp.GetEntries()) != 0 || commitment.Head(resp.GetNext()) != head {
 		t.Errorf("tip range = %d entries, next %x; want 0 entries, next %x",
 			len(resp.GetEntries()), resp.GetNext(), head)
+	}
+}
+
+// Byte-budgeted paging: every page stays under gRPC's default 4 MiB recv
+// size and next resumes past what was delivered.
+func TestRangeByteBudget(t *testing.T) {
+	store, _, con := setupGRPC(t)
+
+	c := newChain(t)
+	mustAppend(t, store, c.open(101, [32]byte{0xef}))
+
+	tx := make([]byte, 1<<20)
+	for range 4 {
+		mustAppend(t, store, c.record(tx))
+	}
+
+	seal, _ := c.seal([]byte("header-101"))
+	mustAppend(t, store, seal)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var (
+		got  int
+		next []byte
+	)
+
+	for {
+		req := &pb.RangeRequest{}
+		if next != nil {
+			req.After = &pb.RangeRequest_Head{Head: next}
+		}
+
+		resp, err := con.Range(ctx, req)
+		if err != nil {
+			t.Fatalf("Range: %v", err)
+		}
+
+		if size := proto.Size(resp); size > 4<<20 {
+			t.Fatalf("page is %d bytes, over the 4 MiB default recv size", size)
+		}
+
+		if len(resp.GetEntries()) == 0 && !resp.GetLive() {
+			t.Fatal("empty non-live page: no progress")
+		}
+
+		got += len(resp.GetEntries())
+		next = resp.GetNext()
+
+		if resp.GetLive() {
+			break
+		}
+	}
+
+	if got != 6 {
+		t.Errorf("paged %d entries, want 6", got)
+	}
+}
+
+func TestBoundBytesOversizedEntry(t *testing.T) {
+	entry := &pb.Entry{Kind: &pb.Entry_Record{Record: &pb.Record{
+		Transactions:     [][]byte{make([]byte, 2*maxRangeBytes)},
+		PrefixCommitment: make([]byte, 32),
+	}}}
+
+	if kept, _ := boundBytes([]*pb.Entry{entry}, maxRangeBytes, true); len(kept) != 1 {
+		t.Errorf("leading oversized entry: kept %d, want 1", len(kept))
+	}
+
+	if kept, _ := boundBytes([]*pb.Entry{entry}, maxRangeBytes, false); len(kept) != 0 {
+		t.Errorf("non-leading oversized entry: kept %d, want 0", len(kept))
 	}
 }
 

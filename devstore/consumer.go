@@ -6,6 +6,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/0xPolygon/sequence-store-proto/commitment"
 	pb "github.com/0xPolygon/sequence-store-proto/sequencestore/v1"
@@ -14,6 +15,16 @@ import (
 const (
 	defaultRangeLimit = 512
 	maxRangeLimit     = 4096
+
+	// maxWaitMs caps the long-poll budget so a single Range call can't
+	// pin a goroutine and connection indefinitely; wait_ms is a uint32,
+	// which admits ~50-day polls.
+	maxWaitMs = 30_000
+
+	// maxRangeBytes bounds the entries in one RangeResponse so it stays
+	// under gRPC's 4 MiB default recv size — an unconfigured consumer can
+	// page a limit's worth of large entries without breaking its channel.
+	maxRangeBytes = 3 << 20
 )
 
 // resolveAfter turns a resume position into the log index to read from.
@@ -135,7 +146,7 @@ func sendEntries(srv pb.ConsumerService_StreamServer, batch []*pb.Entry) error {
 }
 
 // Range returns up to limit entries after the resume position, long-polling
-// up to wait_ms for more when fewer are ready.
+// up to wait_ms (capped at maxWaitMs) for more when fewer are ready.
 func (s *Store) Range(ctx context.Context, req *pb.RangeRequest) (*pb.RangeResponse, error) {
 	limit := int(req.GetLimit())
 	if limit == 0 {
@@ -154,8 +165,9 @@ func (s *Store) Range(ctx context.Context, req *pb.RangeRequest) (*pb.RangeRespo
 		return nil, err
 	}
 
-	deadline := time.Now().Add(time.Duration(req.GetWaitMs()) * time.Millisecond)
+	deadline := time.Now().Add(time.Duration(min(req.GetWaitMs(), maxWaitMs)) * time.Millisecond)
 	entries := make([]*pb.Entry, 0, limit)
+	budget := maxRangeBytes
 
 	for {
 		batch, notify := s.tail(pos)
@@ -163,10 +175,12 @@ func (s *Store) Range(ctx context.Context, req *pb.RangeRequest) (*pb.RangeRespo
 			batch = batch[:take]
 		}
 
-		entries = append(entries, batch...)
-		pos += len(batch)
+		kept, used := boundBytes(batch, budget, len(entries) == 0)
+		entries = append(entries, kept...)
+		pos += len(kept)
+		budget -= used
 
-		if len(entries) == limit || !time.Now().Before(deadline) {
+		if len(kept) < len(batch) || budget <= 0 || len(entries) == limit || !time.Now().Before(deadline) {
 			break
 		}
 
@@ -183,6 +197,24 @@ func (s *Store) Range(ctx context.Context, req *pb.RangeRequest) (*pb.RangeRespo
 	}
 
 	return s.rangeResponse(entries, pos), nil
+}
+
+// boundBytes cuts batch where cumulative encoded size crosses budget. When
+// the response is still empty (first), a leading oversized entry is kept
+// anyway so an entry larger than the whole budget still makes progress.
+func boundBytes(batch []*pb.Entry, budget int, first bool) ([]*pb.Entry, int) {
+	used := 0
+
+	for i, entry := range batch {
+		size := proto.Size(entry)
+		if used+size > budget && !(first && i == 0) {
+			return batch[:i], used
+		}
+
+		used += size
+	}
+
+	return batch, used
 }
 
 // rangeResponse assembles next and live: next is the position the response

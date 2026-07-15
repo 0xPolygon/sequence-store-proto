@@ -150,9 +150,10 @@ service ConsumerService {
   rpc Stream(StreamRequest) returns (stream StreamResponse);
 
   // Range is the pull counterpart of Stream: up to limit entries after the
-  // requested position, with an optional long-poll budget. Same resume
-  // semantics as Stream, including NOT_FOUND for an aged-out or unknown
-  // position.
+  // requested position, with an optional long-poll budget. A response may
+  // carry fewer than limit entries when a server byte budget fills first;
+  // next resumes past what was delivered. Same resume semantics as Stream,
+  // including NOT_FOUND for an aged-out or unknown position.
   rpc Range(RangeRequest) returns (RangeResponse);
 
   // GetBlock fetches block n's entries — its BlockOpen, its Records, and its
@@ -207,6 +208,7 @@ message RangeRequest {
 
   // Long-poll budget in milliseconds: if fewer than limit entries are
   // ready, the request is held up to this long for more before returning.
+  // A server maximum applies.
   uint32 wait_ms = 4;
 }
 

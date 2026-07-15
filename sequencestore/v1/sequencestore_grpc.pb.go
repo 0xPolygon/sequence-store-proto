@@ -163,9 +163,10 @@ type ConsumerServiceClient interface {
 	// consumer falls back to its block anchor.
 	Stream(ctx context.Context, in *StreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamResponse], error)
 	// Range is the pull counterpart of Stream: up to limit entries after the
-	// requested position, with an optional long-poll budget. Same resume
-	// semantics as Stream, including NOT_FOUND for an aged-out or unknown
-	// position.
+	// requested position, with an optional long-poll budget. A response may
+	// carry fewer than limit entries when a server byte budget fills first;
+	// next resumes past what was delivered. Same resume semantics as Stream,
+	// including NOT_FOUND for an aged-out or unknown position.
 	Range(ctx context.Context, in *RangeRequest, opts ...grpc.CallOption) (*RangeResponse, error)
 	// GetBlock fetches block n's entries — its BlockOpen, its Records, and its
 	// BlockSeal once sealed (inclusive fetch). Block-addressed reads resolve to
@@ -238,9 +239,10 @@ type ConsumerServiceServer interface {
 	// consumer falls back to its block anchor.
 	Stream(*StreamRequest, grpc.ServerStreamingServer[StreamResponse]) error
 	// Range is the pull counterpart of Stream: up to limit entries after the
-	// requested position, with an optional long-poll budget. Same resume
-	// semantics as Stream, including NOT_FOUND for an aged-out or unknown
-	// position.
+	// requested position, with an optional long-poll budget. A response may
+	// carry fewer than limit entries when a server byte budget fills first;
+	// next resumes past what was delivered. Same resume semantics as Stream,
+	// including NOT_FOUND for an aged-out or unknown position.
 	Range(context.Context, *RangeRequest) (*RangeResponse, error)
 	// GetBlock fetches block n's entries — its BlockOpen, its Records, and its
 	// BlockSeal once sealed (inclusive fetch). Block-addressed reads resolve to
