@@ -18,6 +18,20 @@ import (
 	pb "github.com/0xPolygon/sequence-store-proto/sequencestore/v1"
 )
 
+const (
+	// maxRecvMsgSize admits whole-block Records batched under load, which
+	// outgrow gRPC's 4 MiB default; consumers dial with a matching
+	// grpc.MaxCallRecvMsgSize.
+	maxRecvMsgSize = 16 << 20
+
+	// Keepalive reaps connections that die without a FIN (NAT timeouts),
+	// unparking Stream RPCs idling on their context; the enforcement policy
+	// lets clients of those infinite streams ping the server just as often.
+	keepaliveTime    = 30 * time.Second
+	keepaliveTimeout = 20 * time.Second
+	minPingInterval  = 10 * time.Second
+)
+
 func main() {
 	addr := flag.String("addr", ":7788", "listen address")
 	chainID := flag.Uint64("chain-id", 137, "chain id seeding the commitment chain")
@@ -30,19 +44,14 @@ func main() {
 
 	store := devstore.New(*chainID)
 
-	// Keepalive reaps connections that die without a FIN (NAT timeouts),
-	// unparking Stream RPCs idling on their context; the enforcement policy
-	// lets clients of those infinite streams ping the server just as often.
 	srv := grpc.NewServer(
-		// Whole-block Records batched under load outgrow gRPC's 4 MiB
-		// default; consumers dial with a matching grpc.MaxCallRecvMsgSize.
-		grpc.MaxRecvMsgSize(16<<20),
+		grpc.MaxRecvMsgSize(maxRecvMsgSize),
 		grpc.KeepaliveParams(keepalive.ServerParameters{
-			Time:    30 * time.Second,
-			Timeout: 20 * time.Second,
+			Time:    keepaliveTime,
+			Timeout: keepaliveTimeout,
 		}),
 		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-			MinTime:             10 * time.Second,
+			MinTime:             minPingInterval,
 			PermitWithoutStream: true,
 		}),
 	)
