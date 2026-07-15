@@ -9,8 +9,10 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 
 	"github.com/0xPolygon/sequence-store-proto/devstore"
 	pb "github.com/0xPolygon/sequence-store-proto/sequencestore/v1"
@@ -28,7 +30,22 @@ func main() {
 
 	store := devstore.New(*chainID)
 
-	srv := grpc.NewServer()
+	// Keepalive reaps connections that die without a FIN (NAT timeouts),
+	// unparking Stream RPCs idling on their context; the enforcement policy
+	// lets clients of those infinite streams ping the server just as often.
+	srv := grpc.NewServer(
+		// Whole-block Records batched under load outgrow gRPC's 4 MiB
+		// default; consumers dial with a matching grpc.MaxCallRecvMsgSize.
+		grpc.MaxRecvMsgSize(16<<20),
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			Time:    30 * time.Second,
+			Timeout: 20 * time.Second,
+		}),
+		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+			MinTime:             10 * time.Second,
+			PermitWithoutStream: true,
+		}),
+	)
 	pb.RegisterPublisherServiceServer(srv, store)
 	pb.RegisterConsumerServiceServer(srv, store)
 
