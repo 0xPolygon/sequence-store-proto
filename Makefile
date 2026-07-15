@@ -12,7 +12,7 @@ generate:
 lint:
 	$(TOOL) buf lint
 	go vet ./...
-	@out="$$($(TOOL) gofumpt -l commitment devstore cmd)" || exit 1; \
+	@out="$$($(TOOL) gofumpt -l chainstate commitment devstore cmd)" || exit 1; \
 	if [ -n "$$out" ]; then echo "gofumpt needed:"; echo "$$out"; exit 1; fi
 
 # Compares the proto against the default branch; run before tagging.
