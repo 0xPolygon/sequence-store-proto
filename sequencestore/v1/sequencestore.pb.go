@@ -319,7 +319,8 @@ type Entry struct {
 	//	*Entry_Record
 	//	*Entry_BlockSeal
 	Kind isEntry_Kind `protobuf_oneof:"kind"`
-	// RESERVED for producer attestation.
+	// Placeholder for future producer attestation; currently unused and ignored
+	// by the protocol.
 	Signature     []byte `protobuf:"bytes,4,opt,name=signature,proto3" json:"signature,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

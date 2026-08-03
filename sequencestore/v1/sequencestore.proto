@@ -90,7 +90,8 @@ message Entry {
     BlockSeal block_seal = 3;
   }
 
-  // RESERVED for producer attestation.
+  // Placeholder for future producer attestation; currently unused and ignored
+  // by the protocol.
   bytes signature = 4;
 }
 
