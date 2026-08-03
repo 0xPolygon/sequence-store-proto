@@ -89,6 +89,10 @@ message Entry {
     Record record = 2;
     BlockSeal block_seal = 3;
   }
+
+  // Placeholder for future producer attestation; currently unused and ignored
+  // by the protocol.
+  bytes signature = 4;
 }
 
 // AckStatus reports the outcome of one published entry.
