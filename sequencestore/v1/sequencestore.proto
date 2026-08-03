@@ -89,6 +89,9 @@ message Entry {
     Record record = 2;
     BlockSeal block_seal = 3;
   }
+
+  // RESERVED for producer attestation.
+  bytes signature = 4;
 }
 
 // AckStatus reports the outcome of one published entry.

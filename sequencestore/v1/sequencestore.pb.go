@@ -318,7 +318,9 @@ type Entry struct {
 	//	*Entry_BlockOpen
 	//	*Entry_Record
 	//	*Entry_BlockSeal
-	Kind          isEntry_Kind `protobuf_oneof:"kind"`
+	Kind isEntry_Kind `protobuf_oneof:"kind"`
+	// RESERVED for producer attestation.
+	Signature     []byte `protobuf:"bytes,4,opt,name=signature,proto3" json:"signature,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -383,6 +385,13 @@ func (x *Entry) GetBlockSeal() *BlockSeal {
 		if x, ok := x.Kind.(*Entry_BlockSeal); ok {
 			return x.BlockSeal
 		}
+	}
+	return nil
+}
+
+func (x *Entry) GetSignature() []byte {
+	if x != nil {
+		return x.Signature
 	}
 	return nil
 }
@@ -991,13 +1000,14 @@ const file_sequencestore_v1_sequencestore_proto_rawDesc = "" +
 	"\x11prefix_commitment\x18\x02 \x01(\fR\x10prefixCommitment\"P\n" +
 	"\tBlockSeal\x12\x16\n" +
 	"\x06header\x18\x01 \x01(\fR\x06header\x12+\n" +
-	"\x11prefix_commitment\x18\x02 \x01(\fR\x10prefixCommitment\"\xbf\x01\n" +
+	"\x11prefix_commitment\x18\x02 \x01(\fR\x10prefixCommitment\"\xdd\x01\n" +
 	"\x05Entry\x12<\n" +
 	"\n" +
 	"block_open\x18\x01 \x01(\v2\x1b.sequencestore.v1.BlockOpenH\x00R\tblockOpen\x122\n" +
 	"\x06record\x18\x02 \x01(\v2\x18.sequencestore.v1.RecordH\x00R\x06record\x12<\n" +
 	"\n" +
-	"block_seal\x18\x03 \x01(\v2\x1b.sequencestore.v1.BlockSealH\x00R\tblockSealB\x06\n" +
+	"block_seal\x18\x03 \x01(\v2\x1b.sequencestore.v1.BlockSealH\x00R\tblockSeal\x12\x1c\n" +
+	"\tsignature\x18\x04 \x01(\fR\tsignatureB\x06\n" +
 	"\x04kind\"?\n" +
 	"\x0ePublishRequest\x12-\n" +
 	"\x05entry\x18\x01 \x01(\v2\x17.sequencestore.v1.EntryR\x05entry\"F\n" +
