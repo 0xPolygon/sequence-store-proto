@@ -1,6 +1,6 @@
 module github.com/0xPolygon/sequence-store-proto
 
-go 1.25.12
+go 1.26.10
 
 require (
 	golang.org/x/crypto v0.51.0
